@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Fishing Frenzy 🎣</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #0a1628;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      touch-action: none;
+    }
+    #gameCanvas {
+      display: block;
+      margin: 0 auto;
+      cursor: pointer;
+      user-select: none;
+    }
+    #ui {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      max-width: 700px;
+      padding: 10px 16px;
+      gap: 8px;
+    }
+    .hud-box {
+      background: rgba(0,0,0,0.55);
+      border: 1.5px solid rgba(255,255,255,0.18);
+      border-radius: 12px;
+      padding: 6px 14px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      backdrop-filter: blur(6px);
+    }
+    .hud-box span { opacity: 0.65; font-weight: 400; font-size: 12px; }
+    #timerBox { color: #ffd700; }
+    #timerBox.warning { color: #ff4444; animation: pulse 0.5s infinite alternate; }
+    #comboBox { color: #ff8c00; display: none; }
+    #comboBox.show { display: block; animation: comboIn 0.3s ease; }
+    @keyframes pulse { from { opacity: 1; } to { opacity: 0.4; } }
+    @keyframes comboIn { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    /* Screens */
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(5, 15, 35, 0.92);
+      backdrop-filter: blur(8px);
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+      pointer-events: all;
+      z-index: 100;
+    }
+    .screen h1 { font-size: clamp(28px, 7vw, 52px); margin-bottom: 8px; }
+    .screen h2 { font-size: clamp(22px, 5vw, 36px); margin-bottom: 6px; }
+    .screen p { font-size: clamp(12px, 3vw, 16px); opacity: 0.78; margin-bottom: 6px; max-width: 480px; }
+    .fish-emoji { font-size: clamp(36px, 9vw, 64px); margin: 6px 0; animation: float 2s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+    .btn {
+      margin-top: 18px;
+      padding: 14px 36px;
+      font-size: clamp(15px, 4vw, 20px);
+      font-weight: 700;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      background: linear-gradient(135deg, #00b4d8, #0077b6);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(0,180,216,0.4);
+      transition: transform 0.15s, box-shadow 0.15s;
+      letter-spacing: 0.5px;
+    }
+    .btn:hover { transform: scale(1.05); box-shadow: 0 6px 28px rgba(0,180,216,0.6); }
+    .btn:active { transform: scale(0.97); }
+    .instructions {
+      margin: 10px 0;
+      background: rgba(255,255,255,0.07);
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-size: clamp(11px, 2.8vw, 14px);
+      line-height: 1.7;
+      max-width: 400px;
+      text-align: left;
+    }
+    .score-display {
+      font-size: clamp(38px, 9vw, 64px);
+      font-weight: 900;
+      color: #ffd700;
+      text-shadow: 0 0 20px rgba(255,215,0,0.5);
+      margin: 8px 0;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 10px 0;
+      width: 100%;
+      max-width: 340px;
+    }
+    .stat-box {
+      background: rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: clamp(11px, 2.8vw, 14px);
+    }
+    .stat-box strong { display: block; font-size: clamp(17px, 4vw, 24px); color: #7dd3fc; }
+    .highscore-badge {
+      background: linear-gradient(135deg, #ffd700, #ff8c00);
+      color: #1a0a00;
+      font-weight: 800;
+      padding: 6px 18px;
+      border-radius: 50px;
+      font-size: clamp(12px, 3vw, 16px);
+      margin: 4px 0;
+    }
+    #catchMsg {
+      position: fixed;
+      top: 45%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      font-size: clamp(18px, 5vw, 26px);
+      font-weight: 900;
+      color: #ffd700;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+      z-index: 200;
+      display: none;
+      white-space: nowrap;
+    }
+    #catchMsg.show {
+      display: block;
+      animation: catchAnim 0.75s ease forwards;
+    }
+    @keyframes catchAnim {
+      0%  { opacity:1; transform: translate(-50%,-50%) scale(0.5); }
+      40% { opacity:1; transform: translate(-50%,-80%) scale(1.3); }
+      100%{ opacity:0; transform: translate(-50%,-130%) scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- START SCREEN -->
+<div class="screen" id="startScreen">
+  <div class="fish-emoji">🎣</div>
+  <h1>Fishing Frenzy</h1>
+  <p>Tangkap sebanyak mungkin ikan dalam 60 detik!</p>
+  <div class="instructions">
+    🖱️ <b>Desktop:</b> Klik &amp; tahan untuk turunkan kail, lepas untuk tarik<br>
+    📱 <b>Mobile:</b> Tap &amp; tahan, lalu lepaskan saat ikan di bawah kail<br>
+    🔥 <b>Combo:</b> Tangkap berturut-turut untuk multiplier poin!<br>
+    ⭐ <b>Ikan langka:</b> Muncul sesekali, poin sangat besar!
+  </div>
+  <div id="startHighScore" style="margin-top:8px; font-size:14px; opacity:0.7;"></div>
+  <button class="btn" onclick="startGame()">🎣 Mulai Bermain</button>
+</div>
+
+<!-- GAME OVER SCREEN -->
+<div class="screen" id="gameOverScreen" style="display:none;">
+  <div class="fish-emoji">🏆</div>
+  <h2>Game Over!</h2>
+  <div class="score-display" id="finalScore">0</div>
+  <div id="newHighScoreBadge" class="highscore-badge" style="display:none;">🏆 Rekor Baru!</div>
+  <div class="stats-grid">
+    <div class="stat-box">Ikan Tertangkap<strong id="statCaught">0</strong></div>
+    <div class="stat-box">Combo Terbaik<strong id="statCombo">0x</strong></div>
+    <div class="stat-box">Rekor Tertinggi<strong id="statHighScore">0</strong></div>
+    <div class="stat-box">Ikan Langka<strong id="statRare">0</strong></div>
+  </div>
+  <button class="btn" onclick="startGame()">🔄 Main Lagi</button>
+</div>
+
+<!-- CANVAS -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- HUD -->
+<div id="ui">
+  <div id="hud" style="display:none;">
+    <div class="hud-box"><span>SKOR</span><br><span id="scoreDisplay" style="font-size:20px;color:#7dd3fc;">0</span></div>
+    <div class="hud-box" id="timerBox"><span>WAKTU</span><br><span id="timerDisplay" style="font-size:20px;">60</span></div>
+    <div class="hud-box" id="comboBox"><span>COMBO</span><br><span id="comboDisplay" style="font-size:20px;">x1</span></div>
+  </div>
+</div>
+
+<!-- CATCH MESSAGE -->
+<div id="catchMsg"></div>
+
+<script>
+// ======================================================
+// AUDIO ENGINE (Web Audio API - no external assets)
+// ======================================================
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function getAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function playSplash() {
+  try {
+    const ac = getAudio();
+    const osc = ac.createOscillator(), g = ac.createGain();
+    osc.connect(g); g.connect(ac.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(500, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(80, ac.currentTime + 0.22);
+    g.gain.setValueAtTime(0.3, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.28);
+    osc.start(); osc.stop(ac.currentTime + 0.28);
+  } catch(e) {}
+}
+function playCatch(isRare) {
+  try {
+    const ac = getAudio();
+    const freqs = isRare ? [523, 659, 784, 1047, 1319] : [523, 659, 784];
+    freqs.forEach((f, i) => {
+      const osc = ac.createOscillator(), g = ac.createGain();
+      osc.connect(g); g.connect(ac.destination);
+      osc.type = 'triangle'; osc.frequency.value = f;
+      const t0 = ac.currentTime + i * 0.09;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(0.22, t0 + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.28);
+      osc.start(t0); osc.stop(t0 + 0.32);
+    });
+  } catch(e) {}
+}
+function playMiss() {
+  try {
+    const ac = getAudio();
+    const osc = ac.createOscillator(), g = ac.createGain();
+    osc.connect(g); g.connect(ac.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(180, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(60, ac.currentTime + 0.18);
+    g.gain.setValueAtTime(0.12, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.22);
+    osc.start(); osc.stop(ac.currentTime + 0.22);
+  } catch(e) {}
+}
+
+// ======================================================
+// CANVAS & DIMENSIONS
+// ======================================================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let W, H, WATER_Y, SEA_BOTTOM;
+
+function resize() {
+  W = canvas.width  = Math.min(window.innerWidth, 700);
+  H = canvas.height = window.innerHeight;
+  WATER_Y    = H * 0.27;
+  SEA_BOTTOM = H * 0.91;
+}
+window.addEventListener('resize', () => { resize(); initWorld(); });
+resize();
+
+// ======================================================
+// FISH TYPE DEFINITIONS
+// ======================================================
+const FISH_TYPES = [
+  { name:'Sarden',   w:28, h:16, speed:2.3, points:10,  depth:0.28, color:'#6bc5f8', rarity:1.00, rare:false },
+  { name:'Emas',     w:36, h:20, speed:1.7, points:30,  depth:0.38, color:'#ffd700', rarity:0.80, rare:false },
+  { name:'Badut',    w:34, h:22, speed:1.4, points:25,  depth:0.33, color:'#ff8c42', rarity:0.75, rare:false },
+  { name:'Tuna',     w:58, h:30, speed:1.1, points:50,  depth:0.58, color:'#4a90d9', rarity:0.50, rare:false },
+  { name:'Mas Koki', w:32, h:30, speed:0.9, points:40,  depth:0.48, color:'#ff6b9d', rarity:0.60, rare:false },
+  { name:'Pelangi',  w:30, h:18, speed:3.2, points:100, depth:0.43, color:'#a78bfa', rarity:0.12, rare:true  },
+  { name:'Legenda',  w:64, h:40, speed:0.65,points:200, depth:0.68, color:'#ffd700', rarity:0.05, rare:true  },
+];
+
+// ======================================================
+// GAME STATE
+// ======================================================
+let gameRunning = false;
+let score = 0, timeLeft = 60, combo = 0, maxCombo = 0, caught = 0, rareCaught = 0;
+let timerInterval = null;
+
+// Hook
+let hookDown = false, hookY = 0, hookTargetY = 0, hookX = 0, lineX = 0;
+
+// World objects
+let fishes = [], particles = [], waves = [], bubbles = [], seaweed = [], lightRays = [];
+let spawnTimer = 0;
+const SPAWN_INTERVAL = 75;
+let gt = 0; // global time
+
+// ======================================================
+// WORLD INITIALIZATION
+// ======================================================
+function initWorld() {
+  waves = [];
+  for (let i = 0; i < 6; i++) {
+    waves.push({
+      amp: 5 + Math.random() * 7,
+      freq: 0.013 + Math.random() * 0.012,
+      speed: 0.25 + Math.random() * 0.55,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+  bubbles = [];
+  for (let i = 0; i < 22; i++) {
+    bubbles.push({
+      x: Math.random() * W,
+      y: WATER_Y + Math.random() * (SEA_BOTTOM - WATER_Y),
+      speed: 0.28 + Math.random() * 0.7,
+      size: 2 + Math.random() * 5,
+      alpha: 0.25 + Math.random() * 0.35
+    });
+  }
+  seaweed = [];
+  const swCount = Math.max(4, Math.floor(W / 65));
+  for (let i = 0; i < swCount; i++) {
+    seaweed.push({
+      x: 20 + (i / swCount) * (W - 40) + (Math.random() - 0.5) * 28,
+      segments: 5 + Math.floor(Math.random() * 4),
+      phase: Math.random() * Math.PI * 2,
+      color: Math.random() < 0.3 ? '#1a6e3a' : '#267a45'
+    });
+  }
+  lightRays = [];
+  for (let i = 0; i < 5; i++) {
+    lightRays.push({
+      x: W * 0.08 + i * (W * 0.21),
+      width: 28 + Math.random() * 60,
+      alpha: 0.035 + Math.random() * 0.045,
+      driftSpeed: 0.28 + Math.random() * 0.35,
+      driftPhase: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+// ======================================================
+// FISH SPAWN
+// ======================================================
+function spawnFish() {
+  // Pick a random fish type weighted by rarity
+  const roll = Math.random();
+  const eligible = FISH_TYPES.filter(f => roll < f.rarity);
+  const type = eligible.length ? eligible[Math.floor(Math.random() * eligible.length)] : FISH_TYPES[0];
+
+  const goRight = Math.random() < 0.5;
+  const depthRange = SEA_BOTTOM - WATER_Y - type.h - 10;
+  const y = WATER_Y + 10 + type.depth * depthRange + (Math.random() - 0.5) * depthRange * 0.18;
+  fishes.push({
+    type,
+    x: goRight ? -type.w - 10 : W + type.w + 10,
+    y,
+    vx: (goRight ? 1 : -1) * type.speed * (0.75 + Math.random() * 0.5),
+    wag: Math.random() * Math.PI * 2,
+    wagSpeed: 0.07 + Math.random() * 0.07,
+    caught: false,
+    alpha: 1
+  });
+}
+
+// ======================================================
+// PARTICLES
+// ======================================================
+function spawnParticles(x, y, color, count) {
+  count = count || 14;
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 / count) * i + Math.random() * 0.6;
+    const spd = 1.8 + Math.random() * 3.5;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd - 2.5,
+      color,
+      alpha: 1,
+      size: 3 + Math.random() * 5,
+    });
+  }
+}
+
+// ======================================================
+// COLOR HELPERS
+// ======================================================
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return [r, g, b];
+}
+function lightenHex(hex, amt) {
+  const [r,g,b] = hexToRgb(hex);
+  return `rgb(${Math.min(255,r+amt)},${Math.min(255,g+amt)},${Math.min(255,b+amt)})`;
+}
+function darkenHex(hex, amt) { return lightenHex(hex, -amt); }
+
+// ======================================================
+// DRAW — SKY
+// ======================================================
+function drawSky() {
+  const grad = ctx.createLinearGradient(0, 0, 0, WATER_Y);
+  grad.addColorStop(0, '#0c2040');
+  grad.addColorStop(0.55, '#1a4a7a');
+  grad.addColorStop(1, '#1d8ec0');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, WATER_Y);
+
+  // Sun glow
+  const sx = W * 0.76, sy = WATER_Y * 0.25;
+  const sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, 60);
+  sg.addColorStop(0, 'rgba(255,248,180,0.98)');
+  sg.addColorStop(0.45, 'rgba(255,210,100,0.38)');
+  sg.addColorStop(1, 'rgba(255,180,50,0)');
+  ctx.fillStyle = sg;
+  ctx.beginPath(); ctx.arc(sx, sy, 60, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,252,210,1)';
+  ctx.beginPath(); ctx.arc(sx, sy, 17, 0, Math.PI * 2); ctx.fill();
+
+  // Clouds
+  [
+    [W*0.13, WATER_Y*0.18, 0.9],
+    [W*0.44, WATER_Y*0.11, 0.75],
+    [W*0.62, WATER_Y*0.30, 0.55],
+  ].forEach(([cx, cy, a]) => {
+    ctx.globalAlpha = a * 0.65;
+    ctx.fillStyle = '#ddf2ff';
+    [[0,0,28],[26,5,20],[-24,6,18],[48,3,16]].forEach(([ox,oy,r]) => {
+      ctx.beginPath(); ctx.arc(cx+ox, cy+oy, r, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+  });
+}
+
+// ======================================================
+// DRAW — WATER & UNDERWATER
+// ======================================================
+function drawWater() {
+  // Underwater body
+  const sea = ctx.createLinearGradient(0, WATER_Y, 0, H);
+  sea.addColorStop(0,   '#0b5080');
+  sea.addColorStop(0.4, '#073560');
+  sea.addColorStop(1,   '#021428');
+  ctx.fillStyle = sea;
+  ctx.fillRect(0, WATER_Y, W, H - WATER_Y);
+
+  // Light rays
+  lightRays.forEach(lr => {
+    const rx = lr.x + Math.sin(gt * lr.driftSpeed + lr.driftPhase) * 12;
+    const rg = ctx.createLinearGradient(rx, WATER_Y, rx, SEA_BOTTOM);
+    rg.addColorStop(0, `rgba(100,200,255,${lr.alpha})`);
+    rg.addColorStop(1, 'rgba(100,200,255,0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.moveTo(rx - lr.width / 2, WATER_Y);
+    ctx.lineTo(rx + lr.width / 2, WATER_Y);
+    ctx.lineTo(rx + lr.width * 0.12, SEA_BOTTOM);
+    ctx.lineTo(rx - lr.width * 0.12, SEA_BOTTOM);
+    ctx.closePath(); ctx.fill();
+  });
+
+  // Sea floor
+  const floor = ctx.createLinearGradient(0, SEA_BOTTOM - 20, 0, H);
+  floor.addColorStop(0, '#2a6a3c');
+  floor.addColorStop(0.4, '#1d5530');
+  floor.addColorStop(1, '#0c2818');
+  ctx.fillStyle = floor;
+  ctx.fillRect(0, SEA_BOTTOM - 8, W, H - SEA_BOTTOM + 8);
+
+  // Rocks
+  [[W*0.1,SEA_BOTTOM],[W*0.32,SEA_BOTTOM],[W*0.58,SEA_BOTTOM],[W*0.82,SEA_BOTTOM]].forEach(([rx,ry]) => {
+    ctx.fillStyle = '#1a3a28';
+    ctx.beginPath();
+    ctx.ellipse(rx, ry, 20 + Math.sin(rx)*6, 11, 0, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  // Seaweed
+  seaweed.forEach(sw => {
+    const segH = (SEA_BOTTOM - WATER_Y) * 0.075;
+    ctx.strokeStyle = sw.color;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    let px = sw.x, py = SEA_BOTTOM - 4;
+    ctx.beginPath(); ctx.moveTo(px, py);
+    for (let i = 0; i < sw.segments; i++) {
+      const sway = Math.sin(gt * 0.85 + sw.phase + i * 0.9) * 8;
+      px += sway; py -= segH;
+      ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  });
+
+  // Wave surface
+  ctx.fillStyle = 'rgba(18,130,195,0.82)';
+  ctx.beginPath();
+  ctx.moveTo(0, WATER_Y);
+  for (let x = 0; x <= W; x += 3) {
+    let y = WATER_Y;
+    waves.forEach(w => { y += Math.sin(x * w.freq + gt * w.speed + w.phase) * w.amp; });
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
+
+  // Wave highlight
+  ctx.strokeStyle = 'rgba(140,230,255,0.5)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, WATER_Y);
+  for (let x = 0; x <= W; x += 3) {
+    let y = WATER_Y;
+    waves.forEach(w => { y += Math.sin(x * w.freq + gt * w.speed + w.phase) * w.amp; });
+    ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+// ======================================================
+// DRAW — BUBBLES
+// ======================================================
+function drawBubbles() {
+  bubbles.forEach(b => {
+    ctx.globalAlpha = b.alpha;
+    ctx.strokeStyle = 'rgba(140,220,255,0.85)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    b.y -= b.speed;
+    if (b.y < WATER_Y) { b.y = SEA_BOTTOM; b.x = Math.random() * W; }
+  });
+}
+
+// ======================================================
+// DRAW — FISH
+// ======================================================
+function drawFish(fish) {
+  const ft = fish.type;
+  const dir = fish.vx > 0 ? 1 : -1;
+  const wag = Math.sin(fish.wag) * 0.22;
+
+  ctx.save();
+  ctx.globalAlpha = fish.alpha;
+  ctx.translate(fish.x, fish.y);
+  ctx.scale(dir, 1);
+  ctx.rotate(wag);
+
+  // Body gradient
+  const bg = ctx.createRadialGradient(-ft.w * 0.12, -ft.h * 0.1, ft.h * 0.05, 0, 0, ft.w * 0.55);
+  bg.addColorStop(0, lightenHex(ft.color, 50));
+  bg.addColorStop(1, darkenHex(ft.color, 25));
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, ft.w * 0.52, ft.h * 0.44, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tail
+  ctx.fillStyle = darkenHex(ft.color, 20);
+  ctx.beginPath();
+  ctx.moveTo(-ft.w * 0.48, 0);
+  ctx.lineTo(-ft.w * 0.88, -ft.h * 0.52);
+  ctx.lineTo(-ft.w * 0.88,  ft.h * 0.52);
+  ctx.closePath(); ctx.fill();
+
+  // Dorsal fin
+  ctx.fillStyle = lightenHex(ft.color, 20) + 'aa';
+  ctx.beginPath();
+  ctx.moveTo(-ft.w * 0.05, -ft.h * 0.32);
+  ctx.lineTo( ft.w * 0.18, -ft.h * 0.68);
+  ctx.lineTo( ft.w * 0.38, -ft.h * 0.32);
+  ctx.closePath(); ctx.fill();
+
+  // Eye white
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(ft.w * 0.24, -ft.h * 0.1, ft.h * 0.16, 0, Math.PI * 2); ctx.fill();
+  // Pupil
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(ft.w * 0.27, -ft.h * 0.1, ft.h * 0.08, 0, Math.PI * 2); ctx.fill();
+  // Eye shine
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(ft.w * 0.29, -ft.h * 0.14, ft.h * 0.035, 0, Math.PI * 2); ctx.fill();
+
+  // Rare glow effect
+  if (ft.rare) {
+    ctx.shadowColor = ft.color;
+    ctx.shadowBlur = 14 + Math.sin(gt * 3) * 5;
+    ctx.strokeStyle = lightenHex(ft.color, 60) + 'cc';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, ft.w * 0.56, ft.h * 0.47, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.restore();
+  fish.wag += fish.wagSpeed;
+}
+
+// ======================================================
+// DRAW — HOOK & LINE
+// ======================================================
+function drawHookLine() {
+  if (!gameRunning) return;
+  // Fishing line from rod tip to hook
+  ctx.strokeStyle = 'rgba(215,210,190,0.65)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(lineX, WATER_Y - 26);
+  ctx.lineTo(hookX, hookY);
+  ctx.stroke();
+
+  // Hook shape
+  ctx.save();
+  ctx.strokeStyle = '#c8a060';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(hookX, hookY);
+  ctx.lineTo(hookX, hookY + 13);
+  ctx.arc(hookX + 5, hookY + 13, 5, Math.PI, Math.PI * 0.45, true);
+  ctx.stroke();
+  ctx.restore();
+
+  // Bait
+  ctx.fillStyle = '#ff6b4a';
+  ctx.beginPath(); ctx.arc(hookX, hookY, 5.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ffaa88';
+  ctx.beginPath(); ctx.arc(hookX - 1.5, hookY - 1.5, 2.5, 0, Math.PI * 2); ctx.fill();
+}
+
+// ======================================================
+// DRAW — BOAT
+// ======================================================
+function drawBoat() {
+  const bx = W * 0.5;
+  let by = WATER_Y;
+  waves.forEach(w => { by += Math.sin(bx * w.freq + gt * w.speed + w.phase) * w.amp; });
+
+  ctx.save();
+  ctx.translate(bx, by - 2);
+  ctx.rotate(Math.sin(gt * 0.55) * 0.035);
+
+  // Hull shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(0, 22, 52, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hull body
+  ctx.fillStyle = '#7b3a10';
+  ctx.beginPath();
+  ctx.moveTo(-54, 0);
+  ctx.lineTo(-47, 18);
+  ctx.lineTo( 47, 18);
+  ctx.lineTo( 54, 0);
+  ctx.closePath(); ctx.fill();
+
+  // Hull trim
+  ctx.fillStyle = '#a05020';
+  ctx.fillRect(-54, -4, 108, 6);
+
+  // Cabin
+  ctx.fillStyle = '#f0ddb0';
+  ctx.fillRect(-20, -24, 40, 24);
+  ctx.fillStyle = '#7ecff5';
+  ctx.fillRect(-15, -20, 13, 11);
+  ctx.fillRect( 4,  -20, 13, 11);
+  ctx.strokeStyle = '#c8a060';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(-20, -24, 40, 24);
+
+  // Fishing rod pole
+  ctx.strokeStyle = '#6b4a18';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-33, -2);
+  ctx.lineTo(-33, -30);
+  ctx.stroke();
+
+  // Fishing rod (points toward hook X)
+  const rodTipOffX = hookX - bx;
+  ctx.strokeStyle = '#9b7428';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-33, -30);
+  ctx.lineTo(rodTipOffX * 0.5, -30);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Keep lineX aligned with rod tip in world space
+  lineX = bx + (hookX - bx) * 0.5;
+}
+
+// ======================================================
+// DRAW — PARTICLES
+// ======================================================
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+    p.x += p.vx; p.y += p.vy; p.vy += 0.1;
+    p.alpha -= 0.025; p.size *= 0.97;
+  });
+  ctx.globalAlpha = 1;
+  for (let i = particles.length - 1; i >= 0; i--) {
+    if (particles[i].alpha <= 0) particles.splice(i, 1);
+  }
+}
+
+// ======================================================
+// HUD UPDATE
+// ======================================================
+function updateHUD() {
+  document.getElementById('scoreDisplay').textContent = score.toLocaleString();
+  document.getElementById('timerDisplay').textContent = timeLeft;
+  document.getElementById('timerBox').classList.toggle('warning', timeLeft <= 10);
+  const comboBox = document.getElementById('comboBox');
+  if (combo >= 2) {
+    comboBox.classList.add('show');
+    const mult = Math.min(1 + (combo - 1) * 0.5, 4).toFixed(1);
+    document.getElementById('comboDisplay').textContent = 'x' + mult;
+  } else {
+    comboBox.classList.remove('show');
+  }
+}
+
+function showCatchMsg(emoji, pts, comboCount) {
+  const el = document.getElementById('catchMsg');
+  el.className = '';
+  void el.offsetWidth;
+  const suffix = comboCount >= 3 ? ' 🔥COMBO!' : comboCount >= 2 ? ' COMBO!' : '';
+  el.textContent = emoji + ' +' + pts + suffix;
+  el.className = 'show';
+}
+
+// ======================================================
+// GAME LOOP
+// ======================================================
+function gameLoop() {
+  if (!gameRunning) return;
+  gt += 0.016;
+
+  // Update light ray drift
+  lightRays.forEach(lr => {});
+
+  ctx.clearRect(0, 0, W, H);
+  drawSky();
+  drawWater();
+  drawBubbles();
+
+  // Update & draw fishes
+  for (let i = fishes.length - 1; i >= 0; i--) {
+    const f = fishes[i];
+    f.x += f.vx;
+
+    // Collision detection with hook
+    if (!f.caught && hookDown && hookY > WATER_Y) {
+      const dx = Math.abs(hookX - f.x);
+      const dy = Math.abs(hookY - f.y);
+      if (dx < f.type.w * 0.58 && dy < f.type.h * 0.58) {
+        f.caught = true;
+        combo++;
+        if (combo > maxCombo) maxCombo = combo;
+        const multiplier = Math.min(1 + (combo - 1) * 0.5, 4);
+        const pts = Math.round(f.type.points * multiplier);
+        score += pts;
+        caught++;
+        if (f.type.rare) rareCaught++;
+        hookDown = false;
+        spawnParticles(f.x, f.y, f.type.color, 16);
+        playCatch(f.type.rare);
+        showCatchMsg(f.type.rare ? '⭐' : '🐟', pts, combo);
+        updateHUD();
+      }
+    }
+
+    // Remove off-screen or caught fish
+    if (f.caught || f.x < -f.type.w - 20 || f.x > W + f.type.w + 20) {
+      fishes.splice(i, 1);
+      continue;
+    }
+    drawFish(f);
+  }
+
+  // Draw hook line BEFORE boat so boat overlaps line near rod
+  if (hookDown || hookY > WATER_Y) drawHookLine();
+
+  drawParticles();
+  drawBoat();
+
+  // Move hook vertically
+  const hookSpeed = 3.8;
+  if (hookDown) {
+    if (hookY < hookTargetY) hookY = Math.min(hookY + hookSpeed, hookTargetY);
+  } else {
+    hookY = Math.max(hookY - hookSpeed * 1.6, WATER_Y - 20);
+  }
+
+  // Spawn fish
+  spawnTimer++;
+  if (spawnTimer >= SPAWN_INTERVAL) {
+    spawnTimer = 0;
+    if (fishes.length < 9) spawnFish();
+    if (fishes.length < 5) spawnFish();
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ======================================================
+// INPUT HANDLING
+// ======================================================
+let pointerHeld = false;
+
+function getClientX(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  if (e.touches && e.touches.length > 0) return (e.touches[0].clientX - rect.left) * scaleX;
+  if (e.changedTouches && e.changedTouches.length > 0) return (e.changedTouches[0].clientX - rect.left) * scaleX;
+  return (e.clientX - rect.left) * scaleX;
+}
+
+function onPointerDown(e) {
+  if (!gameRunning) return;
+  e.preventDefault();
+  pointerHeld = true;
+  hookX = getClientX(e);
+  lineX = hookX;
+  hookDown = true;
+  hookTargetY = SEA_BOTTOM - 18;
+  playSplash();
+}
+function onPointerMove(e) {
+  if (!gameRunning || !pointerHeld) return;
+  e.preventDefault();
+}
+function onPointerUp(e) {
+  if (!gameRunning) return;
+  e.preventDefault();
+  pointerHeld = false;
+  if (hookDown) {
+    hookDown = false;
+    combo = 0;
+    updateHUD();
+    if (hookY > WATER_Y + 20) playMiss();
+  }
+}
+
+canvas.addEventListener('mousedown',  onPointerDown);
+canvas.addEventListener('mousemove',  onPointerMove);
+canvas.addEventListener('mouseup',    onPointerUp);
+canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+canvas.addEventListener('touchmove',  onPointerMove, { passive: false });
+canvas.addEventListener('touchend',   onPointerUp,   { passive: false });
+
+// ======================================================
+// START / END GAME
+// ======================================================
+function startGame() {
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('gameOverScreen').style.display = 'none';
+  document.getElementById('hud').style.display = 'flex';
+
+  score = 0; timeLeft = 60; combo = 0; maxCombo = 0; caught = 0; rareCaught = 0;
+  fishes = []; particles = []; spawnTimer = 0;
+  hookDown = false; pointerHeld = false;
+  hookY = WATER_Y - 20;
+  hookX = W * 0.5;
+  lineX = W * 0.5;
+  gt = 0;
+
+  initWorld();
+  for (let i = 0; i < 5; i++) spawnFish();
+
+  updateHUD();
+  gameRunning = true;
+
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateHUD();
+    if (timeLeft <= 0) { clearInterval(timerInterval); endGame(); }
+  }, 1000);
+
+  requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+  gameRunning = false;
+  hookDown = false;
+
+  const hs = parseInt(localStorage.getItem('fishingFrenzyHS') || '0');
+  const isNew = score > hs;
+  if (isNew) localStorage.setItem('fishingFrenzyHS', String(score));
+
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('finalScore').textContent = score.toLocaleString();
+  document.getElementById('newHighScoreBadge').style.display = isNew ? 'block' : 'none';
+  document.getElementById('statCaught').textContent = caught;
+  document.getElementById('statCombo').textContent = maxCombo + 'x';
+  document.getElementById('statHighScore').textContent = (isNew ? score : hs).toLocaleString();
+  document.getElementById('statRare').textContent = rareCaught;
+  document.getElementById('gameOverScreen').style.display = 'flex';
+}
+
+// ======================================================
+// IDLE BACKGROUND ANIMATION (on start/game-over screens)
+// ======================================================
+function idleLoop() {
+  if (gameRunning) return;
+  gt += 0.016;
+  ctx.clearRect(0, 0, W, H);
+  drawSky();
+  if (waves.length) {
+    drawWater();
+    drawBubbles();
+    drawBoat();
+  }
+  requestAnimationFrame(idleLoop);
+}
+
+// ======================================================
+// BOOTSTRAP
+// ======================================================
+const savedHS = localStorage.getItem('fishingFrenzyHS');
+if (savedHS && parseInt(savedHS) > 0) {
+  document.getElementById('startHighScore').textContent =
+    '🏆 Rekor Terbaik: ' + parseInt(savedHS).toLocaleString() + ' poin';
+}
+initWorld();
+hookX = W * 0.5; lineX = W * 0.5; hookY = WATER_Y - 20;
+idleLoop();
+</script>
+</body>
+</html>
